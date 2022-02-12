@@ -30,14 +30,15 @@ func (options *Options) Validate() bool {
 
 func CheckUniq(input []string, options Options) (output []string) {
 
-	const (
-		initIndex = iota
-		duplicateStartIndex
-		duplicateThreshold
-	)
-	currentDuplicateString := input[initIndex]
-	duplicateNum := initIndex
+	if len(input) == 0 {
+		output = input
+		return
+	}
 
+	if !options.Validate() {
+		output = []string{}
+		return
+	}
 	// define equal func by case
 	var isEqualCase func(str1, str2 string) bool
 	if options.IgnoreCase {
@@ -73,35 +74,52 @@ func CheckUniq(input []string, options Options) (output []string) {
 		}
 		return isEqualCase(str1, str2)
 	}
-	//main handler
+
+	const (
+		duplicateInitialIndex = iota
+		duplicateStartIndex
+		duplicateThreshold
+	)
+	currentDuplicateString := input[duplicateInitialIndex]
+	duplicateNum := duplicateInitialIndex
+
 	for i, str := range input {
-		if isEqualStrings(str, currentDuplicateString) {
+		isEqual := isEqualStrings(str, currentDuplicateString)
+		isNotLast := i != len(input)-1
+		if isEqual {
 			duplicateNum++
-			if i != len(input)-1 {
+			if isNotLast {
 				continue
 			}
 		}
 		switch {
-		case options.OnlyDuplicates:
-			if duplicateNum >= duplicateThreshold {
-				output = append(output, currentDuplicateString)
-			}
-		case options.OnlyUnique:
-			if duplicateNum < duplicateThreshold {
-				output = append(output, currentDuplicateString)
-			}
+		case options.OnlyDuplicates && duplicateNum >= duplicateThreshold:
+			output = append(output, currentDuplicateString)
+
+		case options.OnlyUnique && !isNotLast && !isEqual && duplicateNum < duplicateThreshold:
+			output = append(output, currentDuplicateString)
+			output = append(output, str)
+
+		case options.OnlyUnique && duplicateNum < duplicateThreshold:
+			output = append(output, currentDuplicateString)
+
+		case options.ShowCount && (isNotLast || isEqual):
+			output = append(output, fmt.Sprintf("%d %s", duplicateNum, currentDuplicateString))
+
 		case options.ShowCount:
 			output = append(output, fmt.Sprintf("%d %s", duplicateNum, currentDuplicateString))
-		default:
+			output = append(output, fmt.Sprintf("%d %s", duplicateStartIndex, str))
+
+		case !isNotLast && !isEqual && !options.OnlyDuplicates:
+			output = append(output, currentDuplicateString)
+			output = append(output, str)
+
+		case !options.OnlyDuplicates && !options.OnlyUnique:
 			output = append(output, currentDuplicateString)
 		}
 
 		duplicateNum = duplicateStartIndex
 		currentDuplicateString = str
-
-		if i == len(input)-1 && duplicateNum == duplicateStartIndex && !options.OnlyDuplicates {
-			output = append(output, str)
-		}
 	}
 	return
 }
